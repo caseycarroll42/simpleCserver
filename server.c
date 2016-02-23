@@ -7,7 +7,9 @@
 #include <unistd.h>
 
 #define BUF_SIZE 1024
-#define LISTEN_PORT 60000
+#define LISTEN_PORT 8080
+
+int parseBuffer(char *header);
 
 int main()
 {
@@ -43,6 +45,7 @@ int main()
 	}
 
 	isListening=listen(server_sock, queueSize);
+	printf("Listening on port %d...\n", LISTEN_PORT);
 	if (isListening < 0) 
 	{
 		printf("listen() failed\n");
@@ -54,12 +57,21 @@ int main()
 
 	while(1) {
 		bytes_recvd = recv(sock_recv, buf, BUF_SIZE, 0);
-		buf[bytes_recvd]=0;
-		printf("Received: %s\n", buf);
+		buf[bytes_recvd]=0;		
+		
+		//parse the buffer
+		parseBuffer(buf);
 	}
 
 	close(sock_recv);
 	close(server_sock);
 
 	return 0;
+}
+
+int parseBuffer(char *header) 
+{
+	printf("this is the header: %s\n", header);
+	
+	return 0; //success
 }
