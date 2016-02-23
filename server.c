@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 
-#define BUF_SIZE 1024;
+#define BUF_SIZE 1024
 #define LISTEN_PORT 60000
 
 int main()
