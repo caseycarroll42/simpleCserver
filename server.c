@@ -5,11 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #define BUF_SIZE 1024
 #define LISTEN_PORT 8080
 
-int parseBuffer(char *header);
+void parseBuffer(char *header);
 
 int main()
 {
@@ -23,7 +24,7 @@ int main()
 
 
 	//create socket
-	server_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //might need to change to IPPROTO_IP?
+	server_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	//check if socket creation successful
 	if(server_sock < 0) 
@@ -42,6 +43,7 @@ int main()
 	if(bindSuccess < 0)
 	{
 		printf("bind() failed\n");
+		exit(0);
 	}
 
 	isListening=listen(server_sock, queueSize);
@@ -69,9 +71,25 @@ int main()
 	return 0;
 }
 
-int parseBuffer(char *header) 
+void parseBuffer(char *header) 
 {
+	int i = 0, j = 0;
+	char method[255];
+
 	printf("this is the header: %s\n", header);
-	
-	return 0; //success
+
+	//discover the method from the http request
+	while(!isspace(header[i]))
+	{
+		method[j] = header[i];
+		i++;
+		j++;
+	}
+	method[j] = '\0';
+
+	if(strcasecmp(method, "GET") == 0)
+	{
+		printf("%s\n", method);	
+		//serveFile();
+	}
 }
