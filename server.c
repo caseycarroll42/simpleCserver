@@ -2,6 +2,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define BUF_SIZE 1024
 #define LISTEN_PORT 60000
@@ -10,6 +13,7 @@ int main()
 {
 
 	int bindSuccess, server_sock, isListening, sock_recv, bytes_recvd;
+	socklen_t addr_size;
 	int queueSize = 5;
 	struct sockaddr_in my_addr;
 	struct sockaddr_in recv_addr;
@@ -49,7 +53,7 @@ int main()
 	sock_recv = accept(server_sock, (struct sockaddr *) &recv_addr, &addr_size);
 
 	while(1) {
-		bytes_recvd = recv(sock_recv, bug, BUF_SIZE, 0);
+		bytes_recvd = recv(sock_recv, buf, BUF_SIZE, 0);
 		buf[bytes_recvd]=0;
 		printf("Received: %s\n", buf);
 	}
