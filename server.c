@@ -114,8 +114,8 @@ void parse_buffer(char *header, int client)
 				j++;
 			}
 			i++;
-
 		}
+
 		//see if file exists in resources directory
 		strcat(path, url);
 		printf("%s\n",path );
@@ -144,6 +144,7 @@ void serve_file(FILE *fp, int client, char *file_path) {
 	//send file contents to client
 	stat(file_path, &st);//get info about file, ex: file size
 	buf = (char *)malloc((int)st.st_size); //dynamically allocate buf to size of file
+	
 	//send first character from file to client
 	fgets(buf, sizeof(buf), fp);
 
@@ -161,8 +162,11 @@ void request_webserver(char *url, int client)
 {
 	printf("%s\n", url);
 
-	struct hostent *webserver_info;
-	struct in_addr **addr_list;
+	struct hostent* webserver_info;
+	struct sockaddr_in addr_send;
+
+	int sock_send, send_len, bytes_sent, isConnected;
+	
 
 	if((webserver_info = gethostbyname(url)) == NULL)
 	{
@@ -170,10 +174,33 @@ void request_webserver(char *url, int client)
 		return;
 	}
 
-	printf("%s\n", inet_ntoa(*addr_list[0]));
+	char *ip_address = inet_ntoa(*(struct in_addr *)webserver_info->h_addr);
+	
+	
+	//strcpy(ip_address, inet_ntoa(*addr_list[0]));
+	printf("%s\n", ip_address);
 
-	//get IP address from hostname
+	sock_send = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(sock_send < 0)
+	{
+		printf("socket failed\n");
+		exit(0);
+	}
 
+	memset(&addr_send, 0, sizeof(addr_send));
+	addr_send.sin_family = AF_INET;
+	addr_send.sin_addr.s_addr = inet_addr(ip_address);
+	addr_send.sin_port = htons(80);
+
+	isConnected = connect(sock_send, (struct sockaddr *) &addr_send, sizeof(struct sockaddr));
+	if(isConnected < 0) 
+	{
+		printf("connection failed\n");
+		exit(0);
+	}
+
+	close(sock_send);
+	
 }
 
 void bad_path(int client) {
