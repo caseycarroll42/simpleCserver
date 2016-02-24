@@ -59,13 +59,12 @@ int main()
 	addr_size = sizeof(recv_addr);
 	sock_recv = accept(server_sock, (struct sockaddr *) &recv_addr, &addr_size);
 
-	while(1) {
-		bytes_recvd = recv(sock_recv, buf, BUF_SIZE, 0);
-		buf[bytes_recvd]=0;		
+
+	bytes_recvd = recv(sock_recv, buf, BUF_SIZE, 0);
+	buf[bytes_recvd]=0;		
 		
-		//parse the buffer
-		parse_buffer(buf, sock_recv);
-	}
+	//parse the buffer
+	parse_buffer(buf, sock_recv);
 
 	close(sock_recv);
 	close(server_sock);
@@ -141,11 +140,9 @@ void serve_file(char *file_path, int client) {
 		printf("file can't be opened\n");
 	}
 	
-	buf = (char *)malloc((int)st.st_size);
-	printf("%d\n",(int)st.st_size);
+	buf = (char *)malloc((int)st.st_size);	
 	
 	fgets(buf, sizeof(buf), fp);
-	printf("test\n");
 
 	while(!feof(fp)) {
 		send(client, buf, strlen(buf), 0);
