@@ -13,6 +13,7 @@
 
 void parse_buffer(char *header, int client);
 void serve_file(char *file_path, int client);
+void send_header(int client);
 void bad_path(int client);
 
 int main()
@@ -132,14 +133,18 @@ void serve_file(char *file_path, int client) {
 		exit(0);
 	}
 	
-	buf = (char *)malloc((int)st.st_size);	
-	
+	//send the response header to the client
+	send_header(client);
+
+	//send file contents to client
+	buf = (char *)malloc((int)st.st_size);		
 	fgets(buf, sizeof(buf), fp);
 
 	while(!feof(fp)) {
 		send(client, buf, strlen(buf), 0);
 		fgets(buf, sizeof(buf), fp);
 	}
+
 	fclose(fp);
 }
 
@@ -162,4 +167,17 @@ void bad_path(int client) {
 	 send(client, buf, strlen(buf), 0);
 	 sprintf(buf, "</BODY></HTML>\r\n");
 	 send(client, buf, strlen(buf), 0);
+}
+
+void send_header(int client) {
+	char buf[1024];
+
+	strcpy(buf, "HTTP/1.0 200 OK\r\n");
+	send(client, buf, strlen(buf), 0);
+	strcpy(buf, "casey server");
+	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Content-Type: text/html\r\n");
+	send(client, buf, strlen(buf), 0);
+	strcpy(buf, "\r\n");
+	send(client, buf, strlen(buf), 0);
 }
