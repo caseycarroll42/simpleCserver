@@ -15,6 +15,7 @@ void parse_buffer(char *header, int client);
 void serve_file(char *file_path, int client);
 void send_header(int client);
 void bad_path(int client);
+void request_webserver(char *url);
 
 int main()
 {
@@ -112,7 +113,7 @@ void parse_buffer(char *header, int client)
 			strcat(url, "index.html");
 			strcat(path, url);
 		} else {
-			//user requested specific file
+			//user requested specific file or url
 			strcat(path, url);
 		}
 		serve_file(path, client);
@@ -129,9 +130,11 @@ void serve_file(char *file_path, int client) {
 	
 	if(fp == NULL)
 	{
-		//file not found
-		bad_path(client);
-		exit(0);
+		//check if can connect to webserver
+		request_webserver(file_path);
+		// //file not found
+		// bad_path(client);
+		// exit(0);
 	}
 	
 	//send the response header to the client
@@ -151,6 +154,11 @@ void serve_file(char *file_path, int client) {
 	printf("%s sent to client\n", file_path);
 	fclose(fp);
 	free(buf);
+}
+
+void request_webserver(char *url)
+{
+
 }
 
 void bad_path(int client) {
