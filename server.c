@@ -7,15 +7,18 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+
 
 #define BUF_SIZE 1024
 #define LISTEN_PORT 8080
 
 void parse_buffer(char *header, int client);
-void serve_file(char *file_path, int client);
+void serve_file(FILE *fp, int client, char *file_path);
 void send_header(int client);
 void bad_path(int client);
-void request_webserver(char *url);
+void request_webserver(char *url, int client);
 
 int main()
 {
@@ -83,9 +86,11 @@ void parse_buffer(char *header, int client)
 	char method[255];
 	char url[255];
 	char path[255];
+	FILE *fp;
 
 	//set base path
-	strcpy(path, "resources");
+	strcpy(path, "resources/");
+	printf("%s\n",header );
 
 	//discover the method from the http request
 	while(!isspace(header[i]))
@@ -101,41 +106,37 @@ void parse_buffer(char *header, int client)
 	{
 
 		//absorb url
-		i++;		
+		i++;
 		while(!isspace(header[i]))
 		{
-			url[j] = header[i];
-			i++; j++;
-		}
+			if(header[i] != '/') {
+				url[j] = header[i]; 
+				j++;
+			}
+			i++;
 
-		//if user requests base url, append index.html
-		if(url[strlen(url) - 1] == '/') {
-			strcat(url, "index.html");
-			strcat(path, url);
-		} else {
-			//user requested specific file or url
-			strcat(path, url);
 		}
-		serve_file(path, client);
+		//see if file exists in resources directory
+		strcat(path, url);
+		printf("%s\n",path );
+		fp = fopen(path, "r");
+		
+		if(fp == NULL) 
+		{
+			printf("file doesn't exist on server\n");
+			fclose(fp);
+
+			request_webserver(url, client);
+		} else {
+			serve_file(fp, client, path);
+		}
+		
 	}
 }
 
-void serve_file(char *file_path, int client) {
+void serve_file(FILE *fp, int client, char *file_path) {
 	struct stat st;
-	FILE *fp = NULL;
 	char *buf;
-
-	//open file
-	fp = fopen(file_path, "r");
-	
-	if(fp == NULL)
-	{
-		//check if can connect to webserver
-		request_webserver(file_path);
-		// //file not found
-		// bad_path(client);
-		// exit(0);
-	}
 	
 	//send the response header to the client
 	send_header(client);
@@ -151,13 +152,27 @@ void serve_file(char *file_path, int client) {
 		fgets(buf, sizeof(buf), fp);
 	}
 
-	printf("%s sent to client\n", file_path);
+	printf("%s sent to client\n", file_path); 
 	fclose(fp);
 	free(buf);
 }
 
-void request_webserver(char *url)
+void request_webserver(char *url, int client)
 {
+	printf("%s\n", url);
+
+	struct hostent *webserver_info;
+	struct in_addr **addr_list;
+
+	if((webserver_info = gethostbyname(url)) == NULL)
+	{
+		herror("gethostbyname");
+		return;
+	}
+
+	printf("%s\n", inet_ntoa(*addr_list[0]));
+
+	//get IP address from hostname
 
 }
 
