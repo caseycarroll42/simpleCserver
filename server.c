@@ -69,6 +69,9 @@ int main()
 	parse_buffer(buf, sock_recv);
 
 	close(server_sock);
+	close(LISTEN_PORT);
+
+	printf("%d closed. Server terminating...\n", LISTEN_PORT);
 
 	return 0;
 }
@@ -145,7 +148,9 @@ void serve_file(char *file_path, int client) {
 		fgets(buf, sizeof(buf), fp);
 	}
 
+	printf("%s sent to client\n", file_path);
 	fclose(fp);
+	free(buf);
 }
 
 void bad_path(int client) {
