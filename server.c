@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,8 @@
 #define BUF_SIZE 1024
 #define LISTEN_PORT 8080
 
-void parseBuffer(char *header);
+void parse_buffer(char *header, int client);
+void serve_file(char *file_path, int client);
 
 int main()
 {
@@ -62,7 +64,7 @@ int main()
 		buf[bytes_recvd]=0;		
 		
 		//parse the buffer
-		parseBuffer(buf);
+		parse_buffer(buf, sock_recv);
 	}
 
 	close(sock_recv);
@@ -71,12 +73,15 @@ int main()
 	return 0;
 }
 
-void parseBuffer(char *header) 
+void parse_buffer(char *header, int client) 
 {
 	int i = 0, j = 0;
 	char method[255];
+	char url[255];
+	char path[255];
 
-	printf("this is the header: %s\n", header);
+	//set base path
+	strcpy(path, "website");
 
 	//discover the method from the http request
 	while(!isspace(header[i]))
@@ -85,11 +90,66 @@ void parseBuffer(char *header)
 		i++;
 		j++;
 	}
-	method[j] = '\0';
+	method[j] = '\0'; j = 0;
+
+
 
 	if(strcasecmp(method, "GET") == 0)
 	{
 		printf("%s\n", method);	
-		//serveFile();
+
+		//absorb url
+		i++;
+		printf("%c\n", header[i]);
+		
+		while(!isspace(header[i]))
+		{
+			url[j] = header[i];
+			i++; j++;
+		}
+
+		printf("%s\n", url);
+
+		//if user requests base url, append index.html
+		if(url[strlen(url) - 1] == '/') {
+			strcat(url, "index.html");
+			strcat(path, url);
+		} else {
+			//user requested specific file
+			strcat(path, url);
+		}
+		printf("%s\n", path);
+		serve_file(path, client);
 	}
+}
+
+void serve_file(char *file_path, int client) {
+	struct stat st;
+	FILE *fp = NULL;
+	char *buf;
+
+	stat(file_path, &st);
+
+	printf("%s\n", file_path);
+
+	//open file
+	fp = fopen(file_path, "r");
+	
+	if(fp == NULL)
+	{
+		//file not found
+		printf("file can't be opened\n");
+	}
+	
+	buf = (char *)malloc((int)st.st_size);
+	printf("%d\n",(int)st.st_size);
+	
+	fgets(buf, sizeof(buf), fp);
+	printf("test\n");
+
+	while(!feof(fp)) {
+		send(client, buf, strlen(buf), 0);
+		fgets(buf, sizeof(buf), fp);
+	}
+	fclose(fp);
 }
