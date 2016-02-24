@@ -19,6 +19,7 @@ void serve_file(FILE *fp, int client, char *file_path);
 void send_header(int client);
 void bad_path(int client);
 void request_webserver(char *url, int client);
+void send_HTTP_request(int sock_send, char *host_name);
 
 int main()
 {
@@ -164,8 +165,14 @@ void request_webserver(char *url, int client)
 
 	struct hostent* webserver_info;
 	struct sockaddr_in addr_send;
+	struct sockaddr_in recv_addr;
 
-	int sock_send, send_len, bytes_sent, isConnected;
+	socklen_t addr_size;
+
+	int sock_send, send_len, bytes_sent, isConnected, bytes_recvd;
+	int queueSize = 5;
+	int isListening;
+	char buf[1024];
 	
 
 	if((webserver_info = gethostbyname(url)) == NULL)
@@ -199,7 +206,45 @@ void request_webserver(char *url, int client)
 		exit(0);
 	}
 
+	send_HTTP_request(sock_send, url);
+
+	isListening = listen(sock_send, queueSize);
+	if(isListening == 0)
+	{
+		printf("listen failed\n");
+	}
+
+	addr_size = sizeof(recv_addr);
+	sock_send = accept(sock_send, (struct sockaddr *) &recv_addr, &addr_size);
+
+
+	bytes_recvd = recv(sock_send, buf, BUF_SIZE, 0);
+	buf[bytes_recvd]=0;
+
+	printf("%s\n",buf );
+
 	close(sock_send);
+	
+}
+
+void send_HTTP_request(int sock_send, char * host_name) 
+{
+	char buf[1024];
+	printf("===========================\n");
+	sprintf(buf, "GET / HTTP/1.1\r\n");
+	printf("%s", buf);
+	send(sock_send, buf, strlen(buf), 0);
+	
+	sprintf(buf, "Host: %s\r\n", host_name);
+	printf("%s", buf);
+	send(sock_send, buf, strlen(buf), 0);
+	
+	sprintf(buf, "Connection: keep-alive\r\n");
+	printf("%s", buf);
+	send(sock_send, buf, strlen(buf), 0);
+
+	sprintf(buf, "\r\n");
+	send(sock_send, buf, strlen(buf), 0);
 	
 }
 
