@@ -121,8 +121,6 @@ void serve_file(char *file_path, int client) {
 	FILE *fp = NULL;
 	char *buf;
 
-	stat(file_path, &st);
-
 	//open file
 	fp = fopen(file_path, "r");
 	
@@ -137,7 +135,9 @@ void serve_file(char *file_path, int client) {
 	send_header(client);
 
 	//send file contents to client
-	buf = (char *)malloc((int)st.st_size);		
+	stat(file_path, &st);//get info about file, ex: file size
+	buf = (char *)malloc((int)st.st_size); //dynamically allocate buf to size of file
+	//send first character from file to client
 	fgets(buf, sizeof(buf), fp);
 
 	while(!feof(fp)) {
