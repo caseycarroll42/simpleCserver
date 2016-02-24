@@ -13,6 +13,7 @@
 
 void parse_buffer(char *header, int client);
 void serve_file(char *file_path, int client);
+void bad_path(int client);
 
 int main()
 {
@@ -66,7 +67,6 @@ int main()
 	//parse the buffer
 	parse_buffer(buf, sock_recv);
 
-	close(sock_recv);
 	close(server_sock);
 
 	return 0;
@@ -80,7 +80,7 @@ void parse_buffer(char *header, int client)
 	char path[255];
 
 	//set base path
-	strcpy(path, "website");
+	strcpy(path, "resources");
 
 	//discover the method from the http request
 	while(!isspace(header[i]))
@@ -92,22 +92,16 @@ void parse_buffer(char *header, int client)
 	method[j] = '\0'; j = 0;
 
 
-
 	if(strcasecmp(method, "GET") == 0)
 	{
-		printf("%s\n", method);	
 
 		//absorb url
-		i++;
-		printf("%c\n", header[i]);
-		
+		i++;		
 		while(!isspace(header[i]))
 		{
 			url[j] = header[i];
 			i++; j++;
 		}
-
-		printf("%s\n", url);
 
 		//if user requests base url, append index.html
 		if(url[strlen(url) - 1] == '/') {
@@ -117,7 +111,6 @@ void parse_buffer(char *header, int client)
 			//user requested specific file
 			strcat(path, url);
 		}
-		printf("%s\n", path);
 		serve_file(path, client);
 	}
 }
@@ -129,15 +122,14 @@ void serve_file(char *file_path, int client) {
 
 	stat(file_path, &st);
 
-	printf("%s\n", file_path);
-
 	//open file
 	fp = fopen(file_path, "r");
 	
 	if(fp == NULL)
 	{
 		//file not found
-		printf("file can't be opened\n");
+		bad_path(client);
+		exit(0);
 	}
 	
 	buf = (char *)malloc((int)st.st_size);	
@@ -149,4 +141,25 @@ void serve_file(char *file_path, int client) {
 		fgets(buf, sizeof(buf), fp);
 	}
 	fclose(fp);
+}
+
+void bad_path(int client) {
+	 char buf[1024];
+
+	 sprintf(buf, "HTTP/1.0 404 NOT FOUND\r\n");
+	 send(client, buf, strlen(buf), 0);	 
+	 sprintf(buf, "Content-Type: text/html\r\n");
+	 send(client, buf, strlen(buf), 0);
+	 sprintf(buf, "\r\n");
+	 send(client, buf, strlen(buf), 0);
+	 sprintf(buf, "<HTML><TITLE>Not Found</TITLE>\r\n");
+	 send(client, buf, strlen(buf), 0);
+	 sprintf(buf, "<BODY><P>The server could not fulfill\r\n");
+	 send(client, buf, strlen(buf), 0);
+	 sprintf(buf, "your request because the resource specified\r\n");
+	 send(client, buf, strlen(buf), 0);
+	 sprintf(buf, "is unavailable or nonexistent.\r\n");
+	 send(client, buf, strlen(buf), 0);
+	 sprintf(buf, "</BODY></HTML>\r\n");
+	 send(client, buf, strlen(buf), 0);
 }
