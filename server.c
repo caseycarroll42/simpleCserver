@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <arpa/inet.h>
 
 #define PORT_NO 8080
 
@@ -18,6 +19,7 @@ void perform_action(char *path, char *method, int accept_sock);
 int open_file(char *path, int accept_sock, int isOpen);
 void serve_file(char *resource_path, FILE *fp, int accept_sock);
 void send_header(int result, int accept_sock);
+int connect_to_webserver(char *url);
 
 int main() {
 
@@ -172,7 +174,15 @@ int open_file(char *path, int accept_sock, int isOpen)
 			strcat(resource_path, ".html");
 			fp = fopen(resource_path, "r");
 			if(fp == NULL) {
+				return open_file(resource_path, accept_sock, -3);
+			}
+			break;
+		case -3: //try to connect to webserver
+			if(connect_to_webserver(path) < 0){
+				printf("trying to connect to webserver...\n");
 				return open_file(resource_path, accept_sock, 1);
+			} else {
+				return 5;
 			}
 			break;
 		case 1: 
@@ -193,6 +203,61 @@ int open_file(char *path, int accept_sock, int isOpen)
 	}
 	return 5;
 }
+int connect_to_webserver(char *url)
+{
+	int sockfd, isWritten, isRead;
+	struct sockaddr_in serv_addr;
+	struct hostent *server;
+
+	char buffer[256];
+
+	printf("in webserver func: %s\n", url);
+	server = gethostbyname(url);
+
+	if(server ==NULL)
+	{
+		herror("can't connect to webserver\n");
+		return -1;
+	}
+
+	char *ip_address = inet_ntoa(*(struct in_addr *)server->h_addr);
+
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(sockfd < 0)
+	{
+		printf("error creating socket\n");
+		return -1;
+	}
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = inet_addr(ip_address);
+	serv_addr.sin_port = htons(80);
+
+	if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+	{
+		printf("error while attempting to connect...\n");
+		return -1;
+	}
+
+	sprintf(buffer, "GET / HTTP/1.0\r\nHost: %s\r\n\r\n", url);
+	isWritten = write(sockfd, buffer, strlen(buffer));
+	if(isWritten < 0)
+	{
+		printf("error writing to socket...\n");
+		return -1;
+	}
+
+	isRead = read(sockfd, buffer, 255);
+	if(isRead < 0)
+	{
+		printf("error reading from socket\n");
+		return -1;
+	}
+
+	printf("%s\n", buffer);
+	return 0;
+
+}
 void send_header(int result, int accept_sock) {
 	int writeSuccess;
 	char OK_response[256];
@@ -201,7 +266,7 @@ void send_header(int result, int accept_sock) {
 	if (result == 0)
 	{
 		//send 200
-		printf("test\n");
+		printf("test in OK\n");
 		writeSuccess = write(accept_sock, OK_response, strlen(OK_response));
 		if(writeSuccess < 0)
 		{
@@ -210,7 +275,7 @@ void send_header(int result, int accept_sock) {
 		}
 	} else {
 		//send 404
-		printf("test\n");
+		printf("test in 404\n");
 		strcpy(BAD_response, "HTTP/1.0 404 NOT FOUND\r\n");
 		strcat(BAD_response, "Content-Type: text/html\r\n\r\n");
 		strcat(BAD_response, "<HTML><TITLE>404 Not Found</TITLE><BODY><H1>The server could not fufill your request...</H1></BODY></HTML>\r\n");
