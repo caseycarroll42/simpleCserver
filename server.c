@@ -1,283 +1,234 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <ctype.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include <string.h>
+#include <sys/stat.h>
 
+#define PORT_NO 8080
 
-#define BUF_SIZE 1024
-#define LISTEN_PORT 8080
+void create_server();
+void listen_for_request(int serv_sock);
+void parse_header(char *header, int accept_sock);
+void perform_action(char *path, char *method, int accept_sock);
+int open_file(char *path, int accept_sock, int isOpen);
+void serve_file(char *resource_path, FILE *fp, int accept_sock);
+void send_header(int result, int accept_sock);
 
-void parse_buffer(char *header, int client);
-void serve_file(FILE *fp, int client, char *file_path);
-void send_header(int client);
-void bad_path(int client);
-void request_webserver(char *url, int client);
-void send_HTTP_request(int sock_send, char *host_name);
+int main() {
 
-int main()
-{
-
-	int bindSuccess, server_sock, isListening, sock_recv, bytes_recvd;
-	socklen_t addr_size;
-	int queueSize = 5;
-	struct sockaddr_in my_addr;
-	struct sockaddr_in recv_addr;
-	char buf[BUF_SIZE];
-
-
-	//create socket
-	server_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-	//check if socket creation successful
-	if(server_sock < 0) 
-	{
-		printf("socket() failed\n");
-		exit(0);
-	}
-
-	//make local address structure
-	memset(&my_addr, 0, sizeof(my_addr)); //zero out structure
-	my_addr.sin_family = AF_INET; //set address family
-	my_addr.sin_addr.s_addr = htonl(INADDR_ANY); //set IP
-	my_addr.sin_port = htons((unsigned short)LISTEN_PORT);
-
-	bindSuccess = bind(server_sock, (struct sockaddr *) &my_addr, sizeof (my_addr));
-	if(bindSuccess < 0)
-	{
-		printf("bind() failed\n");
-		exit(0);
-	}
-
-	isListening=listen(server_sock, queueSize);
-	printf("Listening on port %d...\n", LISTEN_PORT);
-	if (isListening < 0) 
-	{
-		printf("listen() failed\n");
-		exit(0);
-	}
-
-	addr_size = sizeof(recv_addr);
-	sock_recv = accept(server_sock, (struct sockaddr *) &recv_addr, &addr_size);
-
-
-	bytes_recvd = recv(sock_recv, buf, BUF_SIZE, 0);
-	buf[bytes_recvd]=0;		
-		
-	//parse the buffer
-	parse_buffer(buf, sock_recv);
-
-	close(server_sock);
-	close(LISTEN_PORT);
-
-	printf("%d closed. Server terminating...\n", LISTEN_PORT);
+	create_server();	
 
 	return 0;
 }
 
-void parse_buffer(char *header, int client) 
+void create_server() 
 {
-	int i = 0, j = 0;
-	char method[255];
-	char url[255];
-	char path[255];
-	FILE *fp;
+	int serv_sock, clilen;
+	
+	struct sockaddr_in serv_addr;
+	
 
-	//set base path
-	strcpy(path, "resources/");
-	printf("%s\n",header );
+	//create socket
+	serv_sock = socket(AF_INET, SOCK_STREAM, 0);
 
-	//discover the method from the http request
-	while(!isspace(header[i]))
+	if(serv_sock < 0)
 	{
-		method[j] = header[i];
-		i++;
-		j++;
+		printf("Socket could not be opened...\n");
+		exit(1);
 	}
-	method[j] = '\0'; j = 0;
 
+	//initialize socket structure
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(PORT_NO);
 
-	if(strcasecmp(method, "GET") == 0)
+	//bind the socket to the port
+	if(bind(serv_sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
 	{
-
-		//absorb url
-		i++;
-		while(!isspace(header[i]))
-		{
-			if(header[i] != '/') {
-				url[j] = header[i]; 
-				j++;
-			}
-			i++;
-		}
-
-		//see if file exists in resources directory
-		strcat(path, url);
-		printf("%s\n",path );
-		fp = fopen(path, "r");
-		
-		if(fp == NULL) 
-		{
-			printf("file doesn't exist on server\n");
-			fclose(fp);
-
-			request_webserver(url, client);
-		} else {
-			serve_file(fp, client, path);
-		}
-		
+		printf("error while binding...\n");
+		exit(1);
 	}
+
+	listen_for_request(serv_sock);
+
+	close(serv_sock);
 }
 
-void serve_file(FILE *fp, int client, char *file_path) {
-	struct stat st;
-	char *buf;
-	
-	//send the response header to the client
-	send_header(client);
-
-	//send file contents to client
-	stat(file_path, &st);//get info about file, ex: file size
-	buf = (char *)malloc((int)st.st_size); //dynamically allocate buf to size of file
-	
-	//send first character from file to client
-	fgets(buf, sizeof(buf), fp);
-
-	while(!feof(fp)) {
-		send(client, buf, strlen(buf), 0);
-		fgets(buf, sizeof(buf), fp);
-	}
-
-	printf("%s sent to client\n", file_path); 
-	fclose(fp);
-	free(buf);
-}
-
-void request_webserver(char *url, int client)
+void listen_for_request(int serv_sock)
 {
-	printf("%s\n", url);
-
-	struct hostent* webserver_info;
-	struct sockaddr_in addr_send;
-	struct sockaddr_in recv_addr;
+	struct sockaddr_in cli_addr;
 
 	socklen_t addr_size;
 
-	int sock_send, send_len, bytes_sent, isConnected, bytes_recvd;
-	int queueSize = 5;
-	int isListening;
-	char buf[1024];
-	
+	int accept_sock, num_data_recv;
+	char buffer[256];
 
-	if((webserver_info = gethostbyname(url)) == NULL)
+	listen(serv_sock, 5);
+	printf("listening on port %d\n", PORT_NO);
+
+	addr_size = sizeof(cli_addr);
+
+	accept_sock = accept(serv_sock, (struct sockaddr *)&cli_addr, &addr_size);
+	if(accept_sock < 0)
 	{
-		herror("gethostbyname");
-		return;
+		printf("error accepting\n");
+		exit(1);
 	}
 
-	char *ip_address = inet_ntoa(*(struct in_addr *)webserver_info->h_addr);
-	
-	
-	//strcpy(ip_address, inet_ntoa(*addr_list[0]));
-	printf("%s\n", ip_address);
+	bzero(buffer, 256);
+	num_data_recv = read(accept_sock, buffer, 255);
 
-	sock_send = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if(sock_send < 0)
+	if(num_data_recv < 0)
 	{
-		printf("socket failed\n");
-		exit(0);
+		printf("error reading from socket\n");
+		exit(1);
 	}
 
-	memset(&addr_send, 0, sizeof(addr_send));
-	addr_send.sin_family = AF_INET;
-	addr_send.sin_addr.s_addr = inet_addr(ip_address);
-	addr_send.sin_port = htons(80);
-
-	isConnected = connect(sock_send, (struct sockaddr *) &addr_send, sizeof(struct sockaddr));
-	if(isConnected < 0) 
-	{
-		printf("connection failed\n");
-		exit(0);
-	}
-
-	send_HTTP_request(sock_send, url);
-
-	isListening = listen(sock_send, queueSize);
-	if(isListening == 0)
-	{
-		printf("listen failed\n");
-	}
-
-	addr_size = sizeof(recv_addr);
-	sock_send = accept(sock_send, (struct sockaddr *) &recv_addr, &addr_size);
-
-
-	bytes_recvd = recv(sock_send, buf, BUF_SIZE, 0);
-	buf[bytes_recvd]=0;
-
-	printf("%s\n",buf );
-
-	close(sock_send);
-	
+	parse_header(buffer, accept_sock);
 }
 
-void send_HTTP_request(int sock_send, char * host_name) 
+void parse_header(char *header, int accept_sock) {
+	char method[256];
+	char path[256];
+
+	int i = 0;
+	int j = 0;
+	int k = 0;
+
+	printf("response header:\n%s", header);
+
+	//get the method
+	while(!isspace(header[i]))
+	{
+		method[j] = header[i];
+		i++; j++;
+	}
+
+	method[j] = '\0';
+	printf("%s\n", method);
+
+	do {
+		i++;
+		
+		if(header[i] != '/')
+		{
+			path[k] = header[i];			
+			k++;
+		}
+		
+	}	while(!isspace(header[i]));
+	path[k-1] = '\0';
+
+	printf("%s\n", path);
+
+	perform_action(path, method, accept_sock);
+}
+
+void perform_action(char *path, char *method, int accept_sock)
 {
-	char buf[1024];
-	printf("===========================\n");
-	sprintf(buf, "GET / HTTP/1.1\r\n");
-	printf("%s", buf);
-	send(sock_send, buf, strlen(buf), 0);
-	
-	sprintf(buf, "Host: %s\r\n", host_name);
-	printf("%s", buf);
-	send(sock_send, buf, strlen(buf), 0);
-	
-	sprintf(buf, "Connection: keep-alive\r\n");
-	printf("%s", buf);
-	send(sock_send, buf, strlen(buf), 0);
+	int isOpen;
+	if(strcasecmp("GET", method) == 0)
+	{
+		isOpen = open_file(path, accept_sock, -1);
+		printf("%d\n", isOpen);
 
-	sprintf(buf, "\r\n");
-	send(sock_send, buf, strlen(buf), 0);
-	
+	} else if (strcasecmp("DELETE", method) == 0)
+	{
+		printf("action not supported!\n");
+	} else if (strcasecmp("POST", method) == 0)
+	{
+		printf("action not supported!\n");
+	} else {
+		printf("error performing action: %s\n", method);
+	}
 }
 
-void bad_path(int client) {
-	 char buf[1024];
+int open_file(char *path, int accept_sock, int isOpen)
+{
+	FILE *fp = NULL;
+	char resource_path[256];
 
-	 sprintf(buf, "HTTP/1.0 404 NOT FOUND\r\n");
-	 send(client, buf, strlen(buf), 0);	 
-	 sprintf(buf, "Content-Type: text/html\r\n");
-	 send(client, buf, strlen(buf), 0);
-	 sprintf(buf, "\r\n");
-	 send(client, buf, strlen(buf), 0);
-	 sprintf(buf, "<HTML><TITLE>Not Found</TITLE>\r\n");
-	 send(client, buf, strlen(buf), 0);
-	 sprintf(buf, "<BODY><P>The server could not fulfill\r\n");
-	 send(client, buf, strlen(buf), 0);
-	 sprintf(buf, "your request because the resource specified\r\n");
-	 send(client, buf, strlen(buf), 0);
-	 sprintf(buf, "is unavailable or nonexistent.\r\n");
-	 send(client, buf, strlen(buf), 0);
-	 sprintf(buf, "</BODY></HTML>\r\n");
-	 send(client, buf, strlen(buf), 0);
+	switch(isOpen)
+	{
+		case -1: //file is not opened, FIRST ATTEMPT
+			strcpy(resource_path, "resources/\0");
+			strcat(resource_path, path);
+			fp = fopen(resource_path, "r");
+			if(fp == NULL)
+			{
+				return open_file(path, accept_sock, -2);
+			} else {
+				return open_file(resource_path, accept_sock, 0); 
+			}
+			break;
+		case -2: //append .html to file
+			strcpy(resource_path, "resources/\0");
+			strcat(resource_path, path);
+			strcat(resource_path, ".html");
+			fp = fopen(resource_path, "r");
+			if(fp == NULL) {
+				return open_file(resource_path, accept_sock, 1);
+			}
+			break;
+		case 1: 
+			printf("all attempts to open file have been exhausted...\n");
+			printf("sending 404\n");
+			send_header(-1, accept_sock);
+			return 5;
+			break;
+		case 0: //file is opened
+			printf("%s\n", path);
+			fp = fopen(path, "r");
+			serve_file(path, fp, accept_sock);
+			return 5;
+			break;
+		default:
+			return 5;
+			break;
+	}
+	return 5;
 }
+void send_header(int result, int accept_sock) {
+	int writeSuccess;
+	char OK_response[256];
+	char BAD_response[256];
+	strcpy(OK_response, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n");
+	if (result == 0)
+	{
+		//send 200
+		printf("test\n");
+		writeSuccess = write(accept_sock, OK_response, strlen(OK_response));
+		if(writeSuccess < 0)
+		{
+			printf("error writing to client\n");
+			exit(1);
+		}
+	} else {
+		//send 404
+		printf("test\n");
+		strcpy(BAD_response, "HTTP/1.0 404 NOT FOUND\r\n");
+		strcat(BAD_response, "Content-Type: text/html\r\n\r\n");
+		strcat(BAD_response, "<HTML><TITLE>404 Not Found</TITLE><BODY><H1>The server could not fufill your request...</H1></BODY></HTML>\r\n");
+		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));
+	}
+}
+void serve_file(char *resource_path, FILE *fp, int accept_sock)
+{
+	struct stat st;
+	char *buf;
+	int writeSuccess;
+	stat(resource_path, &st);
 
-void send_header(int client) {
-	char buf[1024];
+	buf = (char *)malloc((int)st.st_size);
+	printf("%s\n", resource_path);
+	do {
+		fgets(buf, sizeof(buf), fp);
+		writeSuccess = write(accept_sock, buf, strlen(buf));
+	} while(!feof(fp));
 
-	strcpy(buf, "HTTP/1.0 200 OK\r\n");
-	send(client, buf, strlen(buf), 0);
-	strcpy(buf, "casey server");
-	send(client, buf, strlen(buf), 0);
-	sprintf(buf, "Content-Type: text/html\r\n");
-	send(client, buf, strlen(buf), 0);
-	strcpy(buf, "\r\n");
-	send(client, buf, strlen(buf), 0);
 }
