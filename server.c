@@ -57,9 +57,19 @@ int main() {
 	{
 		//make a get request
 		printf("get get get get get got got got got\n");
+		if(file_exists(client_request.path) == 0)
+		{
+			//serve the file
+		} else {
+			//contact webserver
+		}
 	} else {
 		printf("the request: %s is not supported\n", client_request.method);		
 	}
+
+
+	close(serv_sock);
+	close(accept_sock);
 
 	return 0;
 }
