@@ -17,11 +17,6 @@ struct HTTP_request {
 	char path[256];
 };
 
-struct HTTP_response {
-	char buffer[100000];
-	char path[256];
-};
-
 int create_server();
 int connect_to_client(int serv_sock);
 char * recv_request(int accept_sock);
@@ -34,7 +29,7 @@ int open_file(char *path, int accept_sock, int isOpen);
 int serve_file(FILE * fpRead, int accept_sock);
 void send_header(int result, int accept_sock);
 int connect_to_webserver(struct HTTP_request request);
-int listen_webserver(struct HTTP_response response, int web_sock);
+void recv_from_webserver(int web_sock, int local_sock, char *url);
 char * save_to_cache(char *url, char *buffer);
 
 
@@ -80,10 +75,9 @@ int main() {
 			if(web_sock < 0)
 			{
 				printf("error connecting to webserver\n");
-			}
-
-			struct HTTP_response response;
-			listen_webserver(response, web_sock);
+			} else {
+				recv_from_webserver(web_sock, accept_sock, client_request.path);
+			}				
 
 		}
 
@@ -178,7 +172,7 @@ struct HTTP_request parse_header(char *header, int accept_sock) {
 	int j = 0;
 	int k = 0;
 
-	printf("response header:\n%s", header);
+	printf("request header:\n%s", header);
 
 	//get the method
 	while(!isspace(header[i]))
@@ -239,6 +233,7 @@ int connect_to_webserver(struct HTTP_request request)
 	printf("this may take some time...\n");
 	
 	server = gethostbyname(request.path);
+	
 
 	if(server == NULL)
 	{
@@ -266,7 +261,7 @@ int connect_to_webserver(struct HTTP_request request)
 	}
 
 	sprintf(request.method, "GET / HTTP/1.0\r\nHost: %s\r\n\r\n", request.path);
-	isWritten = write(sockfd, request.method, strlen(request.method));
+	isWritten = write(sockfd, request.method, sizeof(request.method));
 	if(isWritten < 0)
 	{
 		printf("error writing to socket...\n");
@@ -276,18 +271,34 @@ int connect_to_webserver(struct HTTP_request request)
 	return sockfd;
 }
 
-int listen_webserver(struct HTTP_response response, int web_sock)
+void recv_from_webserver(int web_sock, int local_sock, char *url)
 {
 	int bytes_read;
+	char buf[500];
+	FILE *fpWrite;
+	FILE *fpRead;
+	char new_filepath[256];
 
-	bytes_read = read(web_sock, response.buffer, (sizeof(response.buffer) - 1));
-	if(bytes_read < 0)
+	//create filename and location for cached website
+	strcpy(new_filepath, "resources/");
+	strcat(new_filepath, url);
+	strcat(new_filepath, ".html");
+
+
+	fpWrite = fopen(new_filepath, "w+");
+
+	while (read(web_sock, buf, sizeof(buf)))
 	{
-		printf("error reading from web socket\n");
-		return -1;
+		fprintf(fpWrite, "%s", buf);		
+		bzero(buf, sizeof(buf));
 	}
+	
+	fseek(fpWrite, 0, SEEK_SET);
+	serve_file(fpWrite, local_sock);
 
-	return web_sock;
+	fclose(fpWrite);
+	
+	return;
 }
 
 
@@ -310,7 +321,7 @@ void send_header(int result, int accept_sock) {
 		printf("test in 404\n");
 		strcpy(BAD_response, "HTTP/1.0 404 NOT FOUND\r\n");
 		strcat(BAD_response, "Content-Type: text/html\r\n\r\n");
-		strcat(BAD_response, "<HTML><TITLE>404 Not Found</TITLE><BODY><H1>The server could not fufill your request...</H1></BODY></HTML>\r\n");
+		strcat(BAD_response, "<HTML><TITLE>404 Not Found</TITLE><BODY><H1>The server could not fufill your request...</H1></BODY></HTML>\r\n\r\n");
 		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));
 	}
 }
@@ -325,11 +336,11 @@ int serve_file(FILE *fpRead, int accept_sock)
 	file_size = ftell(fpRead);
 	fseek (fpRead, 0, SEEK_SET);
 
-	buf = (char *)malloc((int)file_size);
-	//printf("%s\n", resource_path);
-	do {
+	buf = (char *)malloc((long)file_size);
+	do {printf("test\n");
 		fgets(buf, sizeof(buf), fpRead);
 		writeSuccess = write(accept_sock, buf, strlen(buf));
+		bzero(buf, sizeof(buf));
 	} while(!feof(fpRead));
 	return 0;
 }
