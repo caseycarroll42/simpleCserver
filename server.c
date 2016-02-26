@@ -20,6 +20,7 @@ int open_file(char *path, int accept_sock, int isOpen);
 void serve_file(char *resource_path, FILE *fp, int accept_sock);
 void send_header(int result, int accept_sock);
 int connect_to_webserver(char *url);
+void save_to_cache(char *url, char *buffer);
 
 int main() {
 
@@ -167,6 +168,7 @@ int open_file(char *path, int accept_sock, int isOpen)
 			} else {
 				return open_file(resource_path, accept_sock, 0); 
 			}
+			fclose(fp);
 			break;
 		case -2: //append .html to file
 			strcpy(resource_path, "resources/\0");
@@ -174,8 +176,9 @@ int open_file(char *path, int accept_sock, int isOpen)
 			strcat(resource_path, ".html");
 			fp = fopen(resource_path, "r");
 			if(fp == NULL) {
-				return open_file(resource_path, accept_sock, -3);
+				return open_file(path, accept_sock, -3);
 			}
+			fclose(fp);
 			break;
 		case -3: //try to connect to webserver
 			if(connect_to_webserver(path) < 0){
@@ -184,6 +187,7 @@ int open_file(char *path, int accept_sock, int isOpen)
 			} else {
 				return 5;
 			}
+			fclose(fp);
 			break;
 		case 1: 
 			printf("all attempts to open file have been exhausted...\n");
@@ -195,9 +199,11 @@ int open_file(char *path, int accept_sock, int isOpen)
 			printf("%s\n", path);
 			fp = fopen(path, "r");
 			serve_file(path, fp, accept_sock);
+			fclose(fp);
 			return 5;
 			break;
 		default:
+			
 			return 5;
 			break;
 	}
@@ -208,10 +214,12 @@ int connect_to_webserver(char *url)
 	int sockfd, isWritten, isRead;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
+	size_t nbytes = 1000;
+	char buffer[nbytes];
 
-	char buffer[256];
-
-	printf("in webserver func: %s\n", url);
+	printf("looking up %s\n", url);
+	printf("this may take some time...\n");
+	
 	server = gethostbyname(url);
 
 	if(server ==NULL)
@@ -247,12 +255,15 @@ int connect_to_webserver(char *url)
 		return -1;
 	}
 
-	isRead = read(sockfd, buffer, 255);
+	isRead = read(sockfd, buffer, (nbytes-1));
 	if(isRead < 0)
 	{
 		printf("error reading from socket\n");
 		return -1;
 	}
+
+	save_to_cache(url, buffer);
+	// serve_file(url, sockf);
 
 	printf("%s\n", buffer);
 	return 0;
@@ -296,4 +307,25 @@ void serve_file(char *resource_path, FILE *fp, int accept_sock)
 		writeSuccess = write(accept_sock, buf, strlen(buf));
 	} while(!feof(fp));
 
+}
+
+void save_to_cache(char *url, char *buffer)
+{
+	FILE *fp;
+
+	char path[256];
+
+	strcpy(path, "resources/");
+	strcat(path, url);
+	strcat(path, ".html");
+
+	printf("%s\n", path);
+	fp = fopen(path, "w");
+	if(fp == NULL)
+	{
+		printf("error opening file: %s\n", path);
+		return;
+	}
+	fprintf(fp, "%s", buffer);
+	fclose(fp);
 }
