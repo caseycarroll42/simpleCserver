@@ -12,9 +12,18 @@
 
 #define PORT_NO 8080
 
-void create_server();
-void listen_for_request(int serv_sock);
-void parse_header(char *header, int accept_sock);
+struct HTTP_request {
+	char method[256];
+	char path[256];
+};
+
+int create_server();
+int connect_to_client(int serv_sock);
+char * recv_request(int accept_sock);
+
+
+struct HTTP_request parse_header(char *header, int accept_sock);
+
 void perform_action(char *path, char *method, int accept_sock);
 int open_file(char *path, int accept_sock, int isOpen);
 int serve_file(char *resource_path, int accept_sock);
@@ -22,14 +31,40 @@ void send_header(int result, int accept_sock);
 int connect_to_webserver(char *url);
 char * save_to_cache(char *url, char *buffer);
 
-int main() {
 
-	create_server();	
+
+
+int main() {
+	int serv_sock, accept_sock;
+	char header[256];
+	struct HTTP_request client_request;
+	
+	//create socket server
+	serv_sock = create_server();
+
+	//accept connection from the client
+	accept_sock = connect_to_client(serv_sock);
+
+	//get the HTTP request from client
+	strcpy(header, recv_request(accept_sock));
+
+	//parse the HTTP request and put into struct
+	client_request = parse_header(header, accept_sock);
+
+	printf("%s\n%s\n",client_request.method, client_request.path);
+
+	if(strcasecmp(client_request.method, "GET") == 0)
+	{
+		//make a get request
+		printf("get get get get get got got got got\n");
+	} else {
+		printf("the request: %s is not supported\n", client_request.method);		
+	}
 
 	return 0;
 }
 
-void create_server() 
+int create_server() 
 {
 	int serv_sock, clilen;
 	
@@ -57,15 +92,12 @@ void create_server()
 		exit(1);
 	}
 
-	listen_for_request(serv_sock);
-
-	close(serv_sock);
+	return(serv_sock);
 }
 
-void listen_for_request(int serv_sock)
+int connect_to_client(int serv_sock)
 {
 	struct sockaddr_in cli_addr;
-
 	socklen_t addr_size;
 
 	int accept_sock, num_data_recv;
@@ -83,6 +115,14 @@ void listen_for_request(int serv_sock)
 		exit(1);
 	}
 
+	return accept_sock;
+}
+
+char * recv_request(accept_sock)
+{
+	char static buffer[256];
+	int num_data_recv;
+
 	bzero(buffer, 256);
 	num_data_recv = read(accept_sock, buffer, 255);
 
@@ -92,13 +132,14 @@ void listen_for_request(int serv_sock)
 		exit(1);
 	}
 
-	parse_header(buffer, accept_sock);
+	return buffer;
 }
 
-void parse_header(char *header, int accept_sock) {
-	char method[256];
-	char path[256];
+struct HTTP_request parse_header(char *header, int accept_sock) {	
 
+	struct HTTP_request client_request;
+
+	//counters
 	int i = 0;
 	int j = 0;
 	int k = 0;
@@ -108,28 +149,28 @@ void parse_header(char *header, int accept_sock) {
 	//get the method
 	while(!isspace(header[i]))
 	{
-		method[j] = header[i];
+		client_request.method[j] = header[i];
 		i++; j++;
 	}
 
-	method[j] = '\0';
-	printf("%s\n", method);
+	client_request.method[j] = '\0';
+	printf("%s\n", client_request.method);
 
 	do {
 		i++;
 		
 		if(header[i] != '/')
 		{
-			path[k] = header[i];			
+			client_request.path[k] = header[i];			
 			k++;
 		}
 		
 	}	while(!isspace(header[i]));
-	path[k-1] = '\0';
+	client_request.path[k-1] = '\0';
 
-	printf("%s\n", path);
+	printf("%s\n", client_request.path);
 
-	perform_action(path, method, accept_sock);
+	return client_request;
 }
 
 void perform_action(char *path, char *method, int accept_sock)
@@ -213,7 +254,7 @@ int connect_to_webserver(char *url)
 	int sockfd, isWritten, isRead;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
-	size_t nbytes = 1000;
+	size_t nbytes = 100000;
 	char buffer[nbytes];
 	char path[256];
 
@@ -263,6 +304,7 @@ int connect_to_webserver(char *url)
 	}
 
 	strcpy(path, save_to_cache(url, buffer));
+	printf("did this work %s\n", path);
 	serve_file(path, sockfd);
 
 	printf("%s\n", buffer);
