@@ -13,7 +13,12 @@
 #define PORT_NO 8080
 
 struct HTTP_request {
-	char method[256];
+	char method[500];
+	char path[256];
+};
+
+struct HTTP_response {
+	char buffer[100000];
 	char path[256];
 };
 
@@ -28,15 +33,16 @@ void perform_action(char *path, char *method, int accept_sock);
 int open_file(char *path, int accept_sock, int isOpen);
 int serve_file(FILE * fpRead, int accept_sock);
 void send_header(int result, int accept_sock);
-int connect_to_webserver(char *url);
+int connect_to_webserver(struct HTTP_request request);
+int listen_webserver(struct HTTP_response response, int web_sock);
 char * save_to_cache(char *url, char *buffer);
 
 
 
 
 int main() {
-	int serv_sock, accept_sock;
-	char header[256];
+	int serv_sock, accept_sock, web_sock;
+	char header[1000];
 	struct HTTP_request client_request;
 	FILE * fpRead;
 
@@ -57,6 +63,11 @@ int main() {
 	{
 		//make a get request
 		printf("get get get get get got got got got\n");
+		if(client_request.path[0] == '\0')
+		{
+			printf("user requested base url... redirecting to index.html\n");
+			strcat(client_request.path, "index.html");
+		}
 		fpRead = file_exists(client_request.path);
 		if(fpRead != NULL)
 		{
@@ -65,7 +76,15 @@ int main() {
 			serve_file(fpRead, accept_sock); //send file
 		} else {
 			//contact webserver
-			connect_to_webserver(client_request.path);
+			web_sock = connect_to_webserver(client_request);
+			if(web_sock < 0)
+			{
+				printf("error connecting to webserver\n");
+			}
+
+			struct HTTP_response response;
+			listen_webserver(response, web_sock);
+
 		}
 
 	} else {
@@ -210,19 +229,16 @@ FILE * file_exists(char *file_path)
 
 }
 
-int connect_to_webserver(char *url)
+int connect_to_webserver(struct HTTP_request request)
 {
 	int sockfd, isWritten, isRead;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
-	size_t nbytes = 100000;
-	char buffer[nbytes];
-	char path[256];
 
-	printf("looking up %s\n", url);
+	printf("looking up %s\n", request.path);
 	printf("this may take some time...\n");
 	
-	server = gethostbyname(url);
+	server = gethostbyname(request.path);
 
 	if(server == NULL)
 	{
@@ -249,29 +265,32 @@ int connect_to_webserver(char *url)
 		return -1;
 	}
 
-	sprintf(buffer, "GET / HTTP/1.0\r\nHost: %s\r\n\r\n", url);
-	isWritten = write(sockfd, buffer, strlen(buffer));
+	sprintf(request.method, "GET / HTTP/1.0\r\nHost: %s\r\n\r\n", request.path);
+	isWritten = write(sockfd, request.method, strlen(request.method));
 	if(isWritten < 0)
 	{
 		printf("error writing to socket...\n");
 		return -1;
 	}
 
-	isRead = read(sockfd, buffer, (nbytes-1));
-	if(isRead < 0)
+	return sockfd;
+}
+
+int listen_webserver(struct HTTP_response response, int web_sock)
+{
+	int bytes_read;
+
+	bytes_read = read(web_sock, response.buffer, (sizeof(response.buffer) - 1));
+	if(bytes_read < 0)
 	{
-		printf("error reading from socket\n");
+		printf("error reading from web socket\n");
 		return -1;
 	}
 
-	strcpy(path, save_to_cache(url, buffer));
-	printf("did this work %s\n", path);
-	//serve_file(path, sockfd);
-
-	printf("%s\n", buffer);
-	return 0;
-
+	return web_sock;
 }
+
+
 void send_header(int result, int accept_sock) {
 	int writeSuccess;
 	char OK_response[256];
