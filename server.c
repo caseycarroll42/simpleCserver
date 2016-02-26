@@ -20,13 +20,13 @@ struct HTTP_request {
 int create_server();
 int connect_to_client(int serv_sock);
 char * recv_request(int accept_sock);
-
-
 struct HTTP_request parse_header(char *header, int accept_sock);
+
+FILE * file_exists(char *file_path);
 
 void perform_action(char *path, char *method, int accept_sock);
 int open_file(char *path, int accept_sock, int isOpen);
-int serve_file(char *resource_path, int accept_sock);
+int serve_file(FILE * fpRead, int accept_sock);
 void send_header(int result, int accept_sock);
 int connect_to_webserver(char *url);
 char * save_to_cache(char *url, char *buffer);
@@ -38,6 +38,8 @@ int main() {
 	int serv_sock, accept_sock;
 	char header[256];
 	struct HTTP_request client_request;
+	FILE * fpRead;
+
 	
 	//create socket server
 	serv_sock = create_server();
@@ -49,25 +51,28 @@ int main() {
 	strcpy(header, recv_request(accept_sock));
 
 	//parse the HTTP request and put into struct
-	client_request = parse_header(header, accept_sock);
-
-	printf("%s\n%s\n",client_request.method, client_request.path);
+	client_request = parse_header(header, accept_sock);	
 
 	if(strcasecmp(client_request.method, "GET") == 0)
 	{
 		//make a get request
 		printf("get get get get get got got got got\n");
-		if(file_exists(client_request.path) == 0)
+		fpRead = file_exists(client_request.path);
+		if(fpRead != NULL)
 		{
 			//serve the file
+			send_header(0, accept_sock); //send 200 OK
+			serve_file(fpRead, accept_sock); //send file
 		} else {
 			//contact webserver
+			connect_to_webserver(client_request.path);
 		}
+
 	} else {
 		printf("the request: %s is not supported\n", client_request.method);		
 	}
 
-
+	fclose(fpRead);
 	close(serv_sock);
 	close(accept_sock);
 
@@ -183,82 +188,28 @@ struct HTTP_request parse_header(char *header, int accept_sock) {
 	return client_request;
 }
 
-void perform_action(char *path, char *method, int accept_sock)
+FILE * file_exists(char *file_path)
 {
-	int isOpen;
-	if(strcasecmp("GET", method) == 0)
-	{
-		isOpen = open_file(path, accept_sock, -1);
-		printf("%d\n", isOpen);
-
-	} else if (strcasecmp("DELETE", method) == 0)
-	{
-		printf("action not supported!\n");
-	} else if (strcasecmp("POST", method) == 0)
-	{
-		printf("action not supported!\n");
-	} else {
-		printf("error performing action: %s\n", method);
-	}
-}
-
-int open_file(char *path, int accept_sock, int isOpen)
-{
-	FILE *fp = NULL;
+	FILE *fpRead;
 	char resource_path[256];
 
-	switch(isOpen)
+	//create path to resources directory
+	strcpy(resource_path, "resources/");
+	strcat(resource_path, file_path);
+
+	fpRead = fopen(resource_path, "r");
+	if(fpRead == NULL)
 	{
-		case -1: //file is not opened, FIRST ATTEMPT
-			strcpy(resource_path, "resources/\0");
-			strcat(resource_path, path);
-			fp = fopen(resource_path, "r");
-			if(fp == NULL)
-			{
-				return open_file(path, accept_sock, -2);
-			} else {
-				return open_file(resource_path, accept_sock, 0); 
-			}
-			fclose(fp);
-			break;
-		case -2: //append .html to file
-			strcpy(resource_path, "resources/\0");
-			strcat(resource_path, path);
-			strcat(resource_path, ".html");
-			fp = fopen(resource_path, "r");
-			if(fp == NULL) {
-				return open_file(path, accept_sock, -3);
-			} else {
-				return open_file(resource_path, accept_sock, 0);
-			}
-			fclose(fp);
-			break;
-		case -3: //try to connect to webserver
-			if(connect_to_webserver(path) < 0){
-				printf("trying to connect to webserver...\n");
-				return open_file(resource_path, accept_sock, 1);
-			} else {
-				return 5;
-			}
-			fclose(fp);
-			break;
-		case 1: 
-			printf("all attempts to open file have been exhausted...\n");
-			printf("sending 404\n");
-			send_header(-1, accept_sock);
-			return 5;
-			break;
-		case 0: //file is opened
-			printf("serving this file: %s\n", path);
-			serve_file(path, accept_sock);				
-			return 5;
-			break;
-		default:			
-			return 5;
-			break;
+		fclose(fpRead);
+		//append .html to resource path
+		strcat(resource_path, ".html");
+		fpRead = fopen(resource_path, "r");
 	}
-	return 5;
+
+	return fpRead;
+
 }
+
 int connect_to_webserver(char *url)
 {
 	int sockfd, isWritten, isRead;
@@ -273,7 +224,7 @@ int connect_to_webserver(char *url)
 	
 	server = gethostbyname(url);
 
-	if(server ==NULL)
+	if(server == NULL)
 	{
 		herror("can't connect to webserver\n");
 		return -1;
@@ -315,7 +266,7 @@ int connect_to_webserver(char *url)
 
 	strcpy(path, save_to_cache(url, buffer));
 	printf("did this work %s\n", path);
-	serve_file(path, sockfd);
+	//serve_file(path, sockfd);
 
 	printf("%s\n", buffer);
 	return 0;
@@ -329,7 +280,6 @@ void send_header(int result, int accept_sock) {
 	if (result == 0)
 	{
 		//send 200
-		printf("test in OK\n");
 		writeSuccess = write(accept_sock, OK_response, strlen(OK_response));
 		if(writeSuccess < 0)
 		{
@@ -345,28 +295,23 @@ void send_header(int result, int accept_sock) {
 		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));
 	}
 }
-int serve_file(char *resource_path, int accept_sock)
+int serve_file(FILE *fpRead, int accept_sock)
 {
-	struct stat st;
 	char *buf;
 	int writeSuccess;
-	FILE *fp;
+	long file_size;
+	
 
-	fp = fopen(resource_path, "r");
-	if(fp == NULL)
-	{
-		printf("open failed\n");
-		return -1;
-	}
+	fseek (fpRead, 0, SEEK_END);
+	file_size = ftell(fpRead);
+	fseek (fpRead, 0, SEEK_SET);
 
-	stat(resource_path, &st);
-
-	buf = (char *)malloc((int)st.st_size);
-	printf("%s\n", resource_path);
+	buf = (char *)malloc((int)file_size);
+	//printf("%s\n", resource_path);
 	do {
-		fgets(buf, sizeof(buf), fp);
+		fgets(buf, sizeof(buf), fpRead);
 		writeSuccess = write(accept_sock, buf, strlen(buf));
-	} while(!feof(fp));
+	} while(!feof(fpRead));
 	return 0;
 }
 
