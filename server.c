@@ -17,10 +17,10 @@ void listen_for_request(int serv_sock);
 void parse_header(char *header, int accept_sock);
 void perform_action(char *path, char *method, int accept_sock);
 int open_file(char *path, int accept_sock, int isOpen);
-void serve_file(char *resource_path, FILE *fp, int accept_sock);
+int serve_file(char *resource_path, int accept_sock);
 void send_header(int result, int accept_sock);
 int connect_to_webserver(char *url);
-void save_to_cache(char *url, char *buffer);
+char * save_to_cache(char *url, char *buffer);
 
 int main() {
 
@@ -177,6 +177,8 @@ int open_file(char *path, int accept_sock, int isOpen)
 			fp = fopen(resource_path, "r");
 			if(fp == NULL) {
 				return open_file(path, accept_sock, -3);
+			} else {
+				return open_file(resource_path, accept_sock, 0);
 			}
 			fclose(fp);
 			break;
@@ -196,14 +198,11 @@ int open_file(char *path, int accept_sock, int isOpen)
 			return 5;
 			break;
 		case 0: //file is opened
-			printf("%s\n", path);
-			fp = fopen(path, "r");
-			serve_file(path, fp, accept_sock);
-			fclose(fp);
+			printf("serving this file: %s\n", path);
+			serve_file(path, accept_sock);				
 			return 5;
 			break;
-		default:
-			
+		default:			
 			return 5;
 			break;
 	}
@@ -216,6 +215,7 @@ int connect_to_webserver(char *url)
 	struct hostent *server;
 	size_t nbytes = 1000;
 	char buffer[nbytes];
+	char path[256];
 
 	printf("looking up %s\n", url);
 	printf("this may take some time...\n");
@@ -262,8 +262,8 @@ int connect_to_webserver(char *url)
 		return -1;
 	}
 
-	save_to_cache(url, buffer);
-	// serve_file(url, sockf);
+	strcpy(path, save_to_cache(url, buffer));
+	serve_file(path, sockfd);
 
 	printf("%s\n", buffer);
 	return 0;
@@ -293,11 +293,20 @@ void send_header(int result, int accept_sock) {
 		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));
 	}
 }
-void serve_file(char *resource_path, FILE *fp, int accept_sock)
+int serve_file(char *resource_path, int accept_sock)
 {
 	struct stat st;
 	char *buf;
 	int writeSuccess;
+	FILE *fp;
+
+	fp = fopen(resource_path, "r");
+	if(fp == NULL)
+	{
+		printf("open failed\n");
+		return -1;
+	}
+
 	stat(resource_path, &st);
 
 	buf = (char *)malloc((int)st.st_size);
@@ -306,14 +315,14 @@ void serve_file(char *resource_path, FILE *fp, int accept_sock)
 		fgets(buf, sizeof(buf), fp);
 		writeSuccess = write(accept_sock, buf, strlen(buf));
 	} while(!feof(fp));
-
+	return 0;
 }
 
-void save_to_cache(char *url, char *buffer)
+char * save_to_cache(char *url, char *buffer)
 {
 	FILE *fp;
 
-	char path[256];
+	static char path[256];
 
 	strcpy(path, "resources/");
 	strcat(path, url);
@@ -324,8 +333,9 @@ void save_to_cache(char *url, char *buffer)
 	if(fp == NULL)
 	{
 		printf("error opening file: %s\n", path);
-		return;
+		return "/0";
 	}
 	fprintf(fp, "%s", buffer);
 	fclose(fp);
+	return path;
 }
