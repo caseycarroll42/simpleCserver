@@ -14,6 +14,10 @@ This project is an assignment from UNT's Intro to Networks class.
 * the cached html page will now be sent to the browser. 
 	* you can tell by going to the bottom of the page and looking for "THIS IS CACHED"
 
+##Screenshots:
+![alt tag](https://raw.githubusercontent.com/caseycarroll42/simpleCserver/master/serve.index.file.png)
+
+
 ###References:
 * tiny HTTPD: http://tinyhttpd.sourceforge.net
 * HTTP Made Really Easy: http://www.jmarshall.com/easy/http/
