@@ -94,9 +94,9 @@ int main() {
 }
 
 /******************************************************
-/*Create a socket and bind it to a port so that it can 
+ *Create a socket and bind it to a port so that it can 
  * listen for incoming connections.
-/* Returns the socket id 
+ * Returns the socket id 
 ******************************************************/
 int create_server() 
 {
@@ -129,7 +129,7 @@ int create_server()
 	return(serv_sock);
 }
 /******************************************************
-/* Connect to a client with the socket made in create_server().
+ * Connect to a client with the socket made in create_server().
  * This function listens for a connection from the client
  * The function will accept the connection and return the socket id for this connection
  * Parameters: the socket connected to the client
@@ -157,10 +157,10 @@ int connect_to_client(int serv_sock)
 	return accept_sock;
 }
 
-/******************************************************/
-/* Returns the string request sent by the client
+/****************************************************** 
+ * Returns the string request sent by the client
  * Parameters: the socket id for the client connection
-/******************************************************/
+ ******************************************************/
 
 char * recv_request(accept_sock)
 {
@@ -178,10 +178,10 @@ char * recv_request(accept_sock)
 
 	return buffer;
 }
-/******************************************************/
-/* Gets the METHOD and PATH from the HTTP request header
+/******************************************************
+ * Gets the METHOD and PATH from the HTTP request header
  * Returns a stuct that contains the method and path
-/******************************************************/
+ ******************************************************/
 struct HTTP_request parse_header(char *header, int accept_sock) {	
 
 	struct HTTP_request client_request;
@@ -219,13 +219,13 @@ struct HTTP_request parse_header(char *header, int accept_sock) {
 
 	return client_request;
 }
-/******************************************************/
-/* Creates a path that the server can understand. 
+/****************************************************** 
+ * Creates a path that the server can understand. 
  * first attempt: add resources/ to the beginning of
  * 		the path to see if the file exists in the resources directory
  * second attempt: append .html to path to look for a cached webpage
  * Returns the file pointer whether it is NULL or assigned.
-/******************************************************/
+ ******************************************************/
 FILE * file_exists(char *file_path)
 {
 	FILE *fpRead;
@@ -247,12 +247,12 @@ FILE * file_exists(char *file_path)
 	return fpRead;
 
 }
-/******************************************************/
-/* Attempt to connect to a webserver by gettting the domain's
+/****************************************************** 
+ * Attempt to connect to a webserver by gettting the domain's
  * IP address and forming a connection. 
  * Returns the socket id if the connection is successful,
  * otherwise, returns a -1
-/******************************************************/
+ ******************************************************/
 int connect_to_webserver(struct HTTP_request request)
 {
 	int sockfd, isWritten, isRead;
@@ -300,13 +300,13 @@ int connect_to_webserver(struct HTTP_request request)
 
 	return sockfd;
 }
-/******************************************************/
-/* Function will recieve data from webserver and cache it 
+/****************************************************** 
+ * Function will recieve data from webserver and cache it 
  * to the resources directory in the format:
  * 		"<webserver address>.html"
  * function will then send the data recieved from the webserver
  * to the client
-/******************************************************/
+ ******************************************************/
 void recv_from_webserver(int web_sock, int local_sock, char *url)
 {
 	int bytes_read;
@@ -362,14 +362,14 @@ void send_header(int result, int accept_sock) {
 	}
 }
 
-/******************************************************/
-/* Function sends a file to the client by dynamically 
+/******************************************************
+ * Function sends a file to the client by dynamically 
  * allocating space for a buffer that will temporarily 
  * hold the entire file and push it to the client
  * Returns 0 on success
  * Parameters: the file pointer for the file to be sent
  	the socket that will be recieving the file
-/******************************************************/
+******************************************************/
 int serve_file(FILE *fpRead, int accept_sock)
 {
 	char *buf;
