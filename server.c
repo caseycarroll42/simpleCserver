@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 
 #define PORT_NO 8080
+#define BUF_REQUEST_SIZE 1024
 
 struct HTTP_request {
 	char method[500];
@@ -74,7 +75,8 @@ int main() {
 			web_sock = connect_to_webserver(client_request);
 			if(web_sock < 0)
 			{
-				printf("error connecting to webserver\n");
+				printf("send 404\n");
+				send_header(-1, accept_sock);
 			} else {
 				//get the data from the webserver
 				recv_from_webserver(web_sock, accept_sock, client_request.path);
@@ -86,7 +88,9 @@ int main() {
 		printf("the request: %s is not supported\n", client_request.method);		
 	}
 
-	fclose(fpRead);
+	if(fpRead != NULL)
+		fclose(fpRead);
+
 	close(serv_sock);
 	close(accept_sock);
 
@@ -164,11 +168,11 @@ int connect_to_client(int serv_sock)
 
 char * recv_request(accept_sock)
 {
-	char static buffer[256];
+	char static buffer[BUF_REQUEST_SIZE];
 	int num_data_recv;
 
-	bzero(buffer, 256);
-	num_data_recv = read(accept_sock, buffer, 255);
+	bzero(buffer, BUF_REQUEST_SIZE);
+	num_data_recv = read(accept_sock, buffer, BUF_REQUEST_SIZE);
 
 	if(num_data_recv < 0)
 	{
@@ -198,10 +202,7 @@ struct HTTP_request parse_header(char *header, int accept_sock) {
 	{
 		client_request.method[j] = header[i];
 		i++; j++;
-	}
-
-	client_request.method[j] = '\0';
-	printf("%s\n", client_request.method);
+	}	
 
 	do {
 		i++;
@@ -213,9 +214,7 @@ struct HTTP_request parse_header(char *header, int accept_sock) {
 		}
 		
 	}	while(!isspace(header[i]));
-	client_request.path[k-1] = '\0';
-
-	printf("%s\n", client_request.path);
+	client_request.path[k-1] = '\0';	
 
 	return client_request;
 }
@@ -237,8 +236,7 @@ FILE * file_exists(char *file_path)
 
 	fpRead = fopen(resource_path, "r");
 	if(fpRead == NULL)
-	{
-		fclose(fpRead);
+	{			
 		//append .html to resource path
 		strcat(resource_path, ".html");
 		fpRead = fopen(resource_path, "r");
@@ -290,7 +288,7 @@ int connect_to_webserver(struct HTTP_request request)
 		return -1;
 	}
 
-	sprintf(request.method, "GET / HTTP/1.0\r\nHost: %s\r\n\r\n", request.path);
+	sprintf(request.method, "GET / HTTP/1.1\r\nHost: %s\r\n\r\n", request.path);
 	isWritten = write(sockfd, request.method, sizeof(request.method));
 	if(isWritten < 0)
 	{
@@ -333,6 +331,8 @@ void recv_from_webserver(int web_sock, int local_sock, char *url)
 		bzero(buf, sizeof(buf));
 	}
 
+	fprintf(fpWrite, "%s\n", "THIS IS A CHACHED");
+
 	fclose(fpWrite);
 	
 	return;
@@ -343,11 +343,12 @@ void send_header(int result, int accept_sock) {
 	int writeSuccess;
 	char OK_response[256];
 	char BAD_response[256];
-	strcpy(OK_response, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n");
+	strcpy(OK_response, "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=ISO-8859-1\r\n\r\n");
 	if (result == 0)
 	{
 		//send 200
 		writeSuccess = write(accept_sock, OK_response, strlen(OK_response));
+		printf("***********response***********\n%s", OK_response);
 		if(writeSuccess < 0)
 		{
 			printf("error writing to client\n");
@@ -355,10 +356,10 @@ void send_header(int result, int accept_sock) {
 		}
 	} else {
 		//send 404		
-		strcpy(BAD_response, "HTTP/1.0 404 NOT FOUND\r\n");
+		strcpy(BAD_response, "HTTP/1.1 404 NOT FOUND\r\n");
 		strcat(BAD_response, "Content-Type: text/html\r\n\r\n");
 		strcat(BAD_response, "<HTML><TITLE>404 Not Found</TITLE><BODY><H1>The server could not fufill your request...</H1></BODY></HTML>\r\n\r\n");
-		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));
+		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));		
 	}
 }
 
@@ -372,19 +373,15 @@ void send_header(int result, int accept_sock) {
 ******************************************************/
 int serve_file(FILE *fpRead, int accept_sock)
 {
-	char *buf;
+	char buf[256];
 	int writeSuccess;
 	long file_size;
 	
+	bzero(buf, sizeof(buf));
 
-	fseek (fpRead, 0, SEEK_END);
-	file_size = ftell(fpRead);
-	fseek (fpRead, 0, SEEK_SET);
-
-	buf = (char *)malloc((long)file_size);
 	do {
-		fgets(buf, sizeof(buf), fpRead);
-		writeSuccess = write(accept_sock, buf, strlen(buf));
+		fgets(buf, sizeof(buf), fpRead);		
+		writeSuccess = write(accept_sock, buf, strlen(buf));		
 		bzero(buf, sizeof(buf));
 	} while(!feof(fpRead));
 	return 0;
