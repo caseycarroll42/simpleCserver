@@ -54,15 +54,16 @@ int main() {
 	//parse the HTTP request and put into struct
 	client_request = parse_header(header, accept_sock);	
 
+	// Determine what kind of request the client sent
 	if(strcasecmp(client_request.method, "GET") == 0)
-	{
-		//make a get request
-		printf("get get get get get got got got got\n");
+	{				
+		//redirect user to index if they request base url
 		if(client_request.path[0] == '\0')
 		{
 			printf("user requested base url... redirecting to index.html\n");
 			strcat(client_request.path, "index.html");
 		}
+		//check to see if there is a cache or a resource file in the server
 		fpRead = file_exists(client_request.path);
 		if(fpRead != NULL)
 		{
@@ -76,11 +77,12 @@ int main() {
 			{
 				printf("error connecting to webserver\n");
 			} else {
+				//get the data from the webserver
 				recv_from_webserver(web_sock, accept_sock, client_request.path);
 			}				
 
 		}
-
+	//catchall for any other types of requests since they are not required in the assignment
 	} else {
 		printf("the request: %s is not supported\n", client_request.method);		
 	}
@@ -92,6 +94,11 @@ int main() {
 	return 0;
 }
 
+/******************************************************
+/*Create a socket and bind it to a port so that it can 
+ * listen for incoming connections.
+/* Returns the socket id 
+******************************************************/
 int create_server() 
 {
 	int serv_sock, clilen;
@@ -122,7 +129,12 @@ int create_server()
 
 	return(serv_sock);
 }
-
+/******************************************************
+/* Connect to a client with the socket made in create_server().
+ * This function listens for a connection from the client
+ * The function will accept the connection and return the socket id for this connection
+ * Parameters: the socket connected to the client
+******************************************************/
 int connect_to_client(int serv_sock)
 {
 	struct sockaddr_in cli_addr;
@@ -146,6 +158,11 @@ int connect_to_client(int serv_sock)
 	return accept_sock;
 }
 
+/******************************************************/
+/* Returns the string request sent by the client
+ * Parameters: the socket id for the client connection
+/******************************************************/
+
 char * recv_request(accept_sock)
 {
 	char static buffer[256];
@@ -162,7 +179,10 @@ char * recv_request(accept_sock)
 
 	return buffer;
 }
-
+/******************************************************/
+/* Gets the METHOD and PATH from the HTTP request header
+ * Returns a stuct that contains the method and path
+/******************************************************/
 struct HTTP_request parse_header(char *header, int accept_sock) {	
 
 	struct HTTP_request client_request;
@@ -200,7 +220,13 @@ struct HTTP_request parse_header(char *header, int accept_sock) {
 
 	return client_request;
 }
-
+/******************************************************/
+/* Creates a path that the server can understand. 
+ * first attempt: add resources/ to the beginning of
+ * 		the path to see if the file exists in the resources directory
+ * second attempt: append .html to path to look for a cached webpage
+ * Returns the file pointer whether it is NULL or assigned.
+/******************************************************/
 FILE * file_exists(char *file_path)
 {
 	FILE *fpRead;
@@ -222,7 +248,12 @@ FILE * file_exists(char *file_path)
 	return fpRead;
 
 }
-
+/******************************************************/
+/* Attempt to connect to a webserver by gettting the domain's
+ * IP address and forming a connection. 
+ * Returns the socket id if the connection is successful,
+ * otherwise, returns a -1
+/******************************************************/
 int connect_to_webserver(struct HTTP_request request)
 {
 	int sockfd, isWritten, isRead;
@@ -270,7 +301,13 @@ int connect_to_webserver(struct HTTP_request request)
 
 	return sockfd;
 }
-
+/******************************************************/
+/* Function will recieve data from webserver and cache it 
+ * to the resources directory in the format:
+ * 		"<webserver address>.html"
+ * function will then send the data recieved from the webserver
+ * to the client
+/******************************************************/
 void recv_from_webserver(int web_sock, int local_sock, char *url)
 {
 	int bytes_read;
@@ -289,12 +326,13 @@ void recv_from_webserver(int web_sock, int local_sock, char *url)
 
 	while (read(web_sock, buf, sizeof(buf)))
 	{
-		fprintf(fpWrite, "%s", buf);		
+		//save to file
+		fprintf(fpWrite, "%s", buf);	
+		//send to browser/client
+		write(local_sock, buf, sizeof(buf));
+		//clear buffer	
 		bzero(buf, sizeof(buf));
 	}
-	
-	fseek(fpWrite, 0, SEEK_SET);
-	serve_file(fpWrite, local_sock);
 
 	fclose(fpWrite);
 	
