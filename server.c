@@ -30,7 +30,6 @@ int serve_file(FILE * fpRead, int accept_sock);
 void send_header(int result, int accept_sock);
 int connect_to_webserver(struct HTTP_request request);
 void recv_from_webserver(int web_sock, int local_sock, char *url);
-char * save_to_cache(char *url, char *buffer);
 
 
 
@@ -381,26 +380,4 @@ int serve_file(FILE *fpRead, int accept_sock)
 		bzero(buf, sizeof(buf));
 	} while(!feof(fpRead));
 	return 0;
-}
-
-char * save_to_cache(char *url, char *buffer)
-{
-	FILE *fp;
-
-	static char path[256];
-
-	strcpy(path, "resources/");
-	strcat(path, url);
-	strcat(path, ".html");
-
-	printf("%s\n", path);
-	fp = fopen(path, "w");
-	if(fp == NULL)
-	{
-		printf("error opening file: %s\n", path);
-		return "/0";
-	}
-	fprintf(fp, "%s", buffer);
-	fclose(fp);
-	return path;
 }
