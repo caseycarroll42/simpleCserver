@@ -1,9 +1,124 @@
 <!DOCTYPE html>
+
+<!-- 
+Web page will display directions to discovery park from the gab via the Google maps API.
+Current travel time by car is updated via the Google maps API and will change depending on traffic conditions. 
+-->
+
+<!-- Casey Carroll -->
+
 <html>
-	<head>
-		
-	</head>
-	<body>
-		<h1>Dummy Page</h1>
-	</body>
+  <head>
+    <style type="text/css">
+      html, body { height: 100%; margin: 0px; padding: 0; font-family: Arial; text-align: center;}
+      #map { height: 100%;}
+      
+      #results {
+        margin: 25px 25px 25px 25px;
+        padding: 24px 24px 24px 24px;
+        position: absolute;
+        top: 25px; 
+        left: 25px; 
+        background-color: white;
+        box-shadow: 3px 3px 3px #888888;
+        border-radius: 2px;
+        font-family: Roboto;
+        color: grey;
+      }
+
+      #title {
+        font-size: 24px;
+        padding: 32px;
+      }
+
+      .diff {
+        color: black;
+        padding-top: 24px;
+      }
+
+      table {
+        text-align: left;
+      }
+
+      th {
+        color: black;
+        font-weight: 200;
+        padding-bottom: 8px;
+        padding-left: 15px;
+        font-size: 24px;
+      }
+
+      td {
+        padding-left: 15px;
+        font-size: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="results">
+      <table>
+        <th>Travel Time to Discovery Park</th>
+        <tr>
+          <td>Average travel time by bus</td>
+          <td style="color:red;">25 minutes</td>
+        </tr>
+        <tr>
+          <td>Current travel time by car</td>
+          <td id="duration" style="color:green;"></td>
+        </tr>        
+        <tr>
+          <td class="diff">Time lost riding the bus</td>
+          <td class="diff" id="duration_diff"></td>
+        </tr>
+      </table>
+    </div>
+    
+    
+    <script type="text/javascript">
+
+    var map;
+    function initMap() {
+      var denton = {lat: 33.2315144, lng: -97.1553945};
+      var gab = {lat: 33.2131797, lng: -97.1503014};
+      var dp = {lat: 33.2539502, lng: -97.1550846};
+
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: denton,
+        zoom: 14,
+        disableDefaultUI: true
+      });
+
+      var directionsDisplay = new google.maps.DirectionsRenderer({
+        map: map
+      });
+
+      var request = {
+        destination: dp,
+        origin: gab,
+        travelMode: google.maps.TravelMode.DRIVING
+      };
+
+      var directionsService = new google.maps.DirectionsService();
+      directionsService.route(request, function(response, status) {
+        if(status == google.maps.DirectionsStatus.OK) {
+          directionsDisplay.setDirections(response);
+          var duration = document.getElementById('duration');
+          var durationDiff = document.getElementById('duration_diff');
+          var durationResult = parseInt(response.routes[0].legs[0].duration.text);
+          
+          var timeLost = 25 - durationResult;
+          
+          duration.innerHTML = duration.innerHTML + durationResult + ' minutes';
+          durationDiff.innerHTML = durationDiff.innerHTML + timeLost + ' minutes';
+         
+        }
+      });
+    }
+
+    </script>
+    <script async defer
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCsvr7RvvFVeSkUWofCW0O-zaSt1ogD1VQ&callback=initMap">
+    </script>
+  </body>
 </html>
