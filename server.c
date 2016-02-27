@@ -331,7 +331,7 @@ void recv_from_webserver(int web_sock, int local_sock, char *url)
 		bzero(buf, sizeof(buf));
 	}
 
-	fprintf(fpWrite, "%s\n", "THIS IS A CHACHED");
+	fprintf(fpWrite, "%s\n", "THIS IS CHACHED");
 
 	fclose(fpWrite);
 	
