@@ -338,7 +338,7 @@ void recv_from_webserver(int web_sock, int local_sock, char *url)
 	return;
 }
 
-
+//this function simply sends a header to the client
 void send_header(int result, int accept_sock) {
 	int writeSuccess;
 	char OK_response[256];
@@ -362,6 +362,15 @@ void send_header(int result, int accept_sock) {
 		writeSuccess = write(accept_sock, BAD_response, strlen(BAD_response));
 	}
 }
+
+/******************************************************/
+/* Function sends a file to the client by dynamically 
+ * allocating space for a buffer that will temporarily 
+ * hold the entire file and push it to the client
+ * Returns 0 on success
+ * Parameters: the file pointer for the file to be sent
+ 	the socket that will be recieving the file
+/******************************************************/
 int serve_file(FILE *fpRead, int accept_sock)
 {
 	char *buf;
