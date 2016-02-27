@@ -354,8 +354,7 @@ void send_header(int result, int accept_sock) {
 			exit(1);
 		}
 	} else {
-		//send 404
-		printf("test in 404\n");
+		//send 404		
 		strcpy(BAD_response, "HTTP/1.0 404 NOT FOUND\r\n");
 		strcat(BAD_response, "Content-Type: text/html\r\n\r\n");
 		strcat(BAD_response, "<HTML><TITLE>404 Not Found</TITLE><BODY><H1>The server could not fufill your request...</H1></BODY></HTML>\r\n\r\n");
@@ -383,7 +382,7 @@ int serve_file(FILE *fpRead, int accept_sock)
 	fseek (fpRead, 0, SEEK_SET);
 
 	buf = (char *)malloc((long)file_size);
-	do {printf("test\n");
+	do {
 		fgets(buf, sizeof(buf), fpRead);
 		writeSuccess = write(accept_sock, buf, strlen(buf));
 		bzero(buf, sizeof(buf));
