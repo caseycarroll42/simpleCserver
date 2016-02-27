@@ -2,7 +2,7 @@
 
 This project is an assignment from UNT's Intro to Networks class.
 
-###Instructions:
+##Instructions:
 * compile server.c using gcc
 * run compiled program "./a.out"
 * go to proper url on machine and use the port 8080
@@ -14,9 +14,12 @@ This project is an assignment from UNT's Intro to Networks class.
 * the cached html page will now be sent to the browser. 
 	* you can tell by going to the bottom of the page and looking for "THIS IS CACHED"
 
-##Screenshots:
+###Screenshots:
+####Serving index.html from resource directory
 ![alt tag](https://raw.githubusercontent.com/caseycarroll42/simpleCserver/master/serve.index.file.png)
+####Serving file from webserver and caching it to resource directory
 ![alt tag](https://raw.githubusercontent.com/caseycarroll42/simpleCserver/master/cache.site.from.webserver.png)
+####Serving cached html file
 ![alt tag](https://raw.githubusercontent.com/caseycarroll42/simpleCserver/master/serving.cached.file.png)
 
 
