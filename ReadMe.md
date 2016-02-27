@@ -14,6 +14,15 @@ This project is an assignment from UNT's Intro to Networks class.
 * the cached html page will now be sent to the browser. 
 	* you can tell by going to the bottom of the page and looking for "THIS IS CACHED"
 
+##Approach and Limitations
+My first 2 approaches were narrow-minded. Without knowing the full scope of the problem, I wrote programs that weren't modular, making handling different kinds of requests very difficult. It's been a while since I wrote in C, so I was missing and forgetting some key programming paradigms in my first attempts. My last attempt resulted in something that's easy to read and generally more stable. My second attempt had recursion and dynamically memory allocation that was only suitable for my local machine. 
+
+I decided to create a resources directory to keep the html pages and server code serperate from each other. This also made it easier to write the code necessary to open those files. 
+
+All cached web pages follow the naming scheme <domain name>.html. This makes it easy for the program to look up that file before requesting the webserver. 
+
+This program was limited to only having a single thread, making it not very usable for real-world situations. I would have added threading to my program, but I wasn't confident with it, so I decided to keep it simple. 
+
 ###Screenshots:
 ####Serving index.html from resource directory
 ![alt tag](https://raw.githubusercontent.com/caseycarroll42/simpleCserver/master/serve.index.file.png)
